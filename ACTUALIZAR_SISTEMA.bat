@@ -17,6 +17,10 @@ echo Presiona una tecla para iniciar el proceso...
 pause > nul
 
 echo.
+echo [PASO 0] Descargando actualizaciones de GitHub...
+call git pull origin main
+
+echo.
 echo [PASO 1] Actualizando dependencias del Backend...
 call npm install
 

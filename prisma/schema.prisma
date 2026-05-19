@@ -1,0 +1,377 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  password  String
+  role      String   @default("MESERO")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model RolePermission {
+  id        Int      @id @default(autoincrement())
+  role      String
+  module    String
+  createdAt DateTime @default(now())
+  @@unique([role, module])
+}
+
+model Category {
+  id          Int       @id @default(autoincrement())
+  name        String
+  description String?
+  products    Product[]
+  order       Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Product {
+  id           Int       @id @default(autoincrement())
+  name         String
+  description  String?
+  price        Float
+  isWeight     Boolean   @default(false)
+  requiresPrep Boolean   @default(true)
+  categoryId   Int
+  category     Category  @relation(fields: [categoryId], references: [id])
+  barcode      String?   @unique
+  stock        Float     @default(0)
+  recipes      Recipe[]
+  orderItems   OrderItem[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Ingredient {
+  id              Int       @id @default(autoincrement())
+  name            String
+  unit            String
+  stock           Float     @default(0)
+  minStock        Float     @default(0)
+  costoPorUnidad  Float     @default(0)
+  fechaCaducidad  DateTime?
+  recipes         Recipe[]
+  movements       InventoryTransaction[]
+  compraItems     CompraProveedorItem[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Recipe {
+  id           Int        @id @default(autoincrement())
+  productId    Int
+  product      Product    @relation(fields: [productId], references: [id])
+  ingredientId Int
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
+  quantity     Float
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model InventoryTransaction {
+  id           Int        @id @default(autoincrement())
+  ingredientId Int
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
+  type         String
+  quantity     Float
+  reason       String?
+  createdAt    DateTime   @default(now())
+}
+
+model Table {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  capacity  Int      @default(4)
+  status    String   @default("LIBRE")
+  orders    Order[]
+  reservaciones Reservacion[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Order {
+  id            Int         @id @default(autoincrement())
+  tableId       Int?
+  table         Table?      @relation(fields: [tableId], references: [id])
+  clienteId     Int?
+  cliente       Cliente?    @relation(fields: [clienteId], references: [id])
+  type          String      @default("DINE_IN")
+  status        String      @default("PENDING")
+  total         Float       @default(0)
+  discount      Float       @default(0)
+  discountType  String?
+  discountAuth  String?
+  stockDescontado Boolean   @default(false)
+  items         OrderItem[]
+  sales         Sale[]
+  cancelaciones CancelacionOrden[]
+  factura       Factura?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model OrderItem {
+  id        Int      @id @default(autoincrement())
+  orderId   Int
+  order     Order    @relation(fields: [orderId], references: [id])
+  productId Int
+  product   Product  @relation(fields: [productId], references: [id])
+  quantity  Float
+  price     Float
+  subtotal  Float
+  notes     String?
+  status    String   @default("PENDING")
+  createdAt DateTime @default(now())
+}
+
+model Sale {
+  id        Int      @id @default(autoincrement())
+  orderId   Int
+  order     Order    @relation(fields: [orderId], references: [id])
+  turnoId   Int?
+  turno     Turno?   @relation(fields: [turnoId], references: [id])
+  clienteId Int?
+  cliente   Cliente? @relation(fields: [clienteId], references: [id])
+  amount    Float
+  tip       Float    @default(0)
+  method    String
+  createdAt DateTime @default(now())
+}
+
+model CierreCaja {
+  id              Int      @id @default(autoincrement())
+  fecha           DateTime @default(now())
+  fondoInicial    Float    @default(0)
+  ventasEfectivo  Float    @default(0)
+  ventasTarjeta   Float    @default(0)
+  ventasTransfer  Float    @default(0)
+  totalVentas     Float    @default(0)
+  efectivoEsperado Float   @default(0)
+  efectivoContado Float    @default(0)
+  diferencia      Float    @default(0)
+  numTransacciones Int     @default(0)
+  observaciones   String?
+  creadoPor       String?
+}
+
+// ─── TURNOS ──────────────────────────────────────────────────────────────────
+model Turno {
+  id            Int       @id @default(autoincrement())
+  nombre        String
+  cajero        String
+  estado        String    @default("ABIERTO")
+  fondoInicial  Float     @default(0)
+  fondoFinal    Float     @default(0)
+  totalEfectivo Float     @default(0)
+  totalTarjeta  Float     @default(0)
+  totalTransfer Float     @default(0)
+  totalVentas   Float     @default(0)
+  numVentas     Int       @default(0)
+  observaciones String?
+  notasTraspaso String?
+  cerradoPor    String?
+  aperturaAt    DateTime  @default(now())
+  cierreAt      DateTime?
+  ventas        Sale[]
+  createdAt     DateTime  @default(now())
+}
+
+// ─── CLIENTES ─────────────────────────────────────────────────────────────────
+model Cliente {
+  id         Int       @id @default(autoincrement())
+  nombre     String
+  telefono   String?
+  email      String?
+  notas      String?
+  activo     Boolean   @default(true)
+  puntos     Int       @default(0)
+  totalGastado Float   @default(0)
+  ventas     Sale[]
+  facturas   Factura[]
+  
+  // Datos Fiscales (Colombia DIAN)
+  nit            String?   @unique
+  dv             String?   // Dígito de Verificación
+  tipoDocumento  String?   @default("13") // 13=Cédula, 31=NIT, etc
+  tipoPersona    String?   @default("Natural") // Juridica o Natural
+  regimenFiscal  String?   @default("49") // 49=No responsable de IVA, 48=Responsable
+  codPostal      String?
+  municipio      String?   @default("Bogotá")
+  departamento   String?   @default("Cundinamarca")
+  responsabilidad String?  @default("R-99-PN")
+  ordenes    Order[]
+  pedidos    PedidoEspecial[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+// ─── CANCELACIONES FORMALES ───────────────────────────────────────────────────
+model CancelacionOrden {
+  id            Int      @id @default(autoincrement())
+  orderId       Int
+  orden         Order    @relation(fields: [orderId], references: [id])
+  motivo        String
+  itemsCancelados String?
+  autorizadoPor String?
+  creadoPor     String
+  monto         Float    @default(0)
+  createdAt     DateTime @default(now())
+}
+
+// ─── RESERVACIONES ────────────────────────────────────────────────────────────
+model Reservacion {
+  id           Int      @id @default(autoincrement())
+  tableId      Int?
+  table        Table?   @relation(fields: [tableId], references: [id])
+  clienteNombre String
+  clienteTel   String?
+  fecha        DateTime
+  hora         String
+  personas     Int      @default(2)
+  notas        String?
+  estado       String   @default("CONFIRMADA")
+  creadoPor    String?
+  createdAt    DateTime @default(now())
+}
+
+// ─── METAS DE VENTAS ──────────────────────────────────────────────────────────
+model MetaVentas {
+  id    Int   @id @default(autoincrement())
+  mes   Int
+  anio  Int
+  meta  Float
+  @@unique([mes, anio])
+}
+
+// ─── PROVEEDORES ──────────────────────────────────────────────────────────────
+model Proveedor {
+  id        Int               @id @default(autoincrement())
+  nombre    String
+  contacto  String?
+  telefono  String?
+  email     String?
+  notas     String?
+  activo    Boolean           @default(true)
+  compras   CompraProveedor[]
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+}
+
+model CompraProveedor {
+  id          Int                  @id @default(autoincrement())
+  proveedorId Int
+  proveedor   Proveedor            @relation(fields: [proveedorId], references: [id])
+  descripcion String
+  total       Float
+  factura     String?
+  notas       String?
+  creadoPor   String?
+  items       CompraProveedorItem[]
+  createdAt   DateTime             @default(now())
+}
+
+model CompraProveedorItem {
+  id             Int             @id @default(autoincrement())
+  compraId       Int
+  compra         CompraProveedor @relation(fields: [compraId], references: [id])
+  ingredientId   Int?
+  ingredient     Ingredient?     @relation(fields: [ingredientId], references: [id])
+  descripcion    String
+  cantidad       Float
+  unidad         String          @default("unidad")
+  precioUnitario Float           @default(0)
+  subtotal       Float           @default(0)
+}
+
+// ─── CAJA CHICA ───────────────────────────────────────────────────────────────
+model CajaChica {
+  id          Int      @id @default(autoincrement())
+  descripcion String
+  categoria   String   @default("OTROS")
+  monto       Float
+  comprobante String?
+  turnoId     Int?
+  creadoPor   String?
+  createdAt   DateTime @default(now())
+}
+
+// ─── DESCUENTOS ───────────────────────────────────────────────────────────────
+model Descuento {
+  id           Int       @id @default(autoincrement())
+  nombre       String
+  tipo         String
+  valor        Float
+  activo       Boolean   @default(true)
+  descripcion  String?
+  requiereAuth Boolean   @default(false)
+  desde        DateTime?
+  hasta        DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+// ─── CONFIG ───────────────────────────────────────────────────────────────────
+model Config {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  value     String   @default("")
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+// ─── PEDIDOS ESPECIALES ───────────────────────────────────────────────────────
+model PedidoEspecial {
+  id              Int      @id @default(autoincrement())
+  clienteNombre   String
+  clienteTelefono String?
+  clienteId       Int?
+  cliente         Cliente? @relation(fields: [clienteId], references: [id])
+  descripcion     String
+  fechaEntrega    DateTime
+  anticipo        Float    @default(0)
+  total           Float    @default(0)
+  status          String   @default("PENDIENTE")
+  notas           String?
+  creadoPor       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ─── AUDIT LOG ────────────────────────────────────────────────────────────────
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  usuario   String
+  accion    String
+  detalle   String?
+  createdAt DateTime @default(now())
+}
+
+model Factura {
+  id              Int      @id @default(autoincrement())
+  orderId         Int      @unique
+  orden           Order    @relation(fields: [orderId], references: [id])
+  clienteId       Int?
+  cliente         Cliente? @relation(fields: [clienteId], references: [id])
+  
+  numeroFactura   String   @unique // Prefijo + Número (ej: SETT123)
+  cufe            String?  @unique // Código Único de Factura Electrónica
+  qrCode          String?  // Contenido del QR de la DIAN
+  xmlUrl          String?
+  pdfUrl          String?
+  status          String   @default("SENT") // SENT, ACCEPTED, REJECTED
+  errorDian       String?
+  
+  fechaEmision    DateTime @default(now())
+  createdAt       DateTime @default(now())
+}

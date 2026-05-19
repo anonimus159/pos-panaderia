@@ -1,0 +1,11 @@
+node_modules
+frontend/node_modules
+.env
+/generated/prisma
+frontend/dist
+dev.db
+dev.db-journal
+scratch
+update
+FastPOS_Instalador_Limpio
+*.log

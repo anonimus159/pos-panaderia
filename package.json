@@ -7,8 +7,8 @@
     "dev:backend": "nodemon server.js",
     "dev:frontend": "cd frontend && npm run dev",
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "build": "cd frontend && npm run build",
-    "start": "node server.js"
+    "build": "npm install --prefix frontend --include=dev && npm run build --prefix frontend && npx prisma generate",
+    "start": "npx prisma db push && node server.js"
   },
   "keywords": [],
   "author": "",

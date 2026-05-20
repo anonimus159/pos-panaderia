@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Users, ShoppingCart, X, Clock, Utensils, RefreshCw, CalendarDays, Barcode, Printer, Trash2 } from 'lucide-react';
+import { Plus, Users, ShoppingCart, X, Clock, Utensils, RefreshCw, CalendarDays, Barcode, Printer, Trash2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
@@ -17,14 +17,18 @@ export default function Tables() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData]     = useState({ name: '', capacity: 4 });
   const [vista, setVista]           = useState('visual'); // 'visual' | 'lista'
+  const [tableToDelete, setTableToDelete] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchTables();
     const socket = io();
-    socket.on('tableUpdated', (updatedTable) => {
-      setTables(prev => prev.map(t => t.id === updatedTable.id ? { ...t, status: updatedTable.status } : t));
-    });
+    const handleUpdate = () => {
+      fetchTables();
+    };
+    socket.on('tableUpdated', handleUpdate);
+    socket.on('table_updated', handleUpdate);
+    socket.on('table_deleted', handleUpdate);
     return () => socket.disconnect();
   }, []);
 
@@ -202,16 +206,19 @@ export default function Tables() {
     } catch (err) { console.error(err); }
   };
 
-  const handleDelete = async (tableId, tableName) => {
-    if (!window.confirm(`¿Estás seguro de que deseas eliminar la "${tableName}"?`)) {
-      return;
-    }
+  const handleDelete = (tableId, tableName) => {
+    setTableToDelete({ id: tableId, name: tableName });
+  };
+
+  const confirmDelete = async () => {
+    if (!tableToDelete) return;
     try {
-      const res = await fetch(`/api/tables/${tableId}`, {
+      const res = await fetch(`/api/tables/${tableToDelete.id}`, {
         method: 'DELETE'
       });
       const data = await res.json();
       if (data.success) {
+        setTableToDelete(null);
         fetchTables();
       } else {
         alert(data.message || 'Error al eliminar la mesa');
@@ -464,6 +471,50 @@ export default function Tables() {
                   Guardar Mesa
                 </button>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal confirmar eliminar mesa */}
+      <AnimatePresence>
+        {tableToDelete && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-xl flex items-center justify-center z-50 p-4">
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-[#16161A] p-8 rounded-[2rem] w-full max-w-sm border border-white/10 shadow-2xl relative overflow-hidden"
+            >
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-500 via-rose-500 to-red-500" />
+              
+              <div className="flex flex-col items-center text-center gap-4">
+                <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500 animate-pulse">
+                  <AlertTriangle className="w-8 h-8" />
+                </div>
+                
+                <div>
+                  <h3 className="text-2xl font-light text-white">¿Eliminar Mesa?</h3>
+                  <p className="text-sm text-gray-400 mt-2">
+                    ¿Estás seguro de que deseas eliminar la <span className="text-red-400 font-bold">"{tableToDelete.name}"</span>? Esta acción no se puede deshacer.
+                  </p>
+                </div>
+
+                <div className="flex gap-3 w-full mt-4">
+                  <button
+                    onClick={() => setTableToDelete(null)}
+                    className="flex-1 bg-white/5 hover:bg-white/10 text-white font-medium py-3.5 rounded-2xl border border-white/5 transition-all text-sm cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={confirmDelete}
+                    className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3.5 rounded-2xl transition-all shadow-[0_0_20px_rgba(239,68,68,0.2)] text-sm cursor-pointer"
+                  >
+                    Eliminar
+                  </button>
+                </div>
+              </div>
             </motion.div>
           </div>
         )}

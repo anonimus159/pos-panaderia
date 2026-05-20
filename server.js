@@ -29,6 +29,7 @@ import adminRoutes from './src/routes/admin.js';
 import printRoutes from './src/routes/print.js';
 import billingRoutes from './src/routes/billing.js';
 import uploadRoutes from './src/routes/upload.js';
+import ventasRoutes from './src/routes/ventas.js';
 
 dotenv.config();
 
@@ -70,6 +71,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/print', printRoutes);
 app.use('/api/facturacion', billingRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/ventas', ventasRoutes);
 
 // Socket.io
 io.on('connection', (socket) => {

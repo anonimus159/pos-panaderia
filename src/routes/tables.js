@@ -186,4 +186,54 @@ router.put('/:id', authenticate, async (req, res) => {
   } catch (e) { res.status(500).json({ success: false }); }
 });
 
+router.delete('/:id', authenticate, async (req, res) => {
+  try {
+    const tableId = parseInt(req.params.id);
+
+    // 1. Check if the table has active orders (PENDING, PREPARING, READY)
+    const activeOrders = await prisma.order.findMany({
+      where: {
+        tableId,
+        status: { in: ['PENDING', 'PREPARING', 'READY'] }
+      }
+    });
+
+    if (activeOrders.length > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'No se puede eliminar la mesa porque tiene órdenes activas.' 
+      });
+    }
+
+    // 2. Set tableId to null for all orders (historical/completed) to avoid foreign key violations
+    await prisma.order.updateMany({
+      where: { tableId },
+      data: { tableId: null }
+    });
+
+    // 3. Set tableId to null for all reservaciones
+    await prisma.reservacion.updateMany({
+      where: { tableId },
+      data: { tableId: null }
+    });
+
+    // 4. Delete the table
+    await prisma.table.delete({
+      where: { id: tableId }
+    });
+
+    // 5. Emit socket events to notify the clients
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('table_deleted', { id: tableId });
+      io.emit('tableUpdated');
+    }
+
+    res.json({ success: true, message: 'Mesa eliminada con éxito.' });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ success: false, message: 'Error al eliminar la mesa.' });
+  }
+});
+
 export default router;

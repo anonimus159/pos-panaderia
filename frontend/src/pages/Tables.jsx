@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Users, ShoppingCart, X, Clock, Utensils, RefreshCw, CalendarDays, Barcode, Printer } from 'lucide-react';
+import { Plus, Users, ShoppingCart, X, Clock, Utensils, RefreshCw, CalendarDays, Barcode, Printer, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
@@ -202,6 +202,26 @@ export default function Tables() {
     } catch (err) { console.error(err); }
   };
 
+  const handleDelete = async (tableId, tableName) => {
+    if (!window.confirm(`¿Estás seguro de que deseas eliminar la "${tableName}"?`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/tables/${tableId}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (data.success) {
+        fetchTables();
+      } else {
+        alert(data.message || 'Error al eliminar la mesa');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error al conectar con el servidor');
+    }
+  };
+
   const libres   = tables.filter(t => t.status === 'LIBRE').length;
   const ocupadas = tables.filter(t => t.status === 'OCUPADA').length;
 
@@ -272,17 +292,30 @@ export default function Tables() {
             <Barcode className={`w-8 h-4 ${libre ? 'text-gray-700' : 'text-amber-100/30'}`} />
             <span className={`text-[9px] font-mono tracking-widest ${libre ? 'text-gray-700' : 'text-amber-100/40'}`}>MESA{table.id}</span>
           </div>
-          <button 
-            onClick={(e) => { e.stopPropagation(); printVintageLabel(table); }}
-            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
-              !libre
-                ? 'bg-white/10 hover:bg-white/20 text-amber-100 border border-white/10'
-                : 'bg-[#0a0a0c] hover:bg-amber-500 hover:text-black text-gray-600 border border-white/5'
-            }`}
-            title="Imprimir Etiqueta"
-          >
-            <Printer className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button 
+              onClick={(e) => { e.stopPropagation(); printVintageLabel(table); }}
+              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                !libre
+                  ? 'bg-white/10 hover:bg-white/20 text-amber-100 border border-white/10'
+                  : 'bg-[#0a0a0c] hover:bg-amber-500 hover:text-black text-gray-600 border border-white/5'
+              }`}
+              title="Imprimir Etiqueta"
+            >
+              <Printer className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={(e) => { e.stopPropagation(); handleDelete(table.id, table.name); }}
+              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                !libre
+                  ? 'bg-white/10 hover:bg-red-500 hover:text-white text-amber-100/50 border border-white/10'
+                  : 'bg-[#0a0a0c] hover:bg-red-500 hover:text-white text-gray-600 border border-white/5'
+              }`}
+              title="Eliminar Mesa"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </motion.div>
     );
@@ -375,8 +408,20 @@ export default function Tables() {
                        }`}>{t.status}</span>
                      </td>
                      <td className="px-6 py-4 text-gray-500 text-xs">{elapsed || '—'}</td>
-                    <td className="px-6 py-4 text-right">
-                      <span className="text-amber-400 text-xs font-bold hover:underline">Ver mesa →</span>
+                    <td className="px-6 py-4 text-right flex justify-end gap-3 items-center" onClick={(e) => e.stopPropagation()}>
+                      <button 
+                        onClick={() => navigate(`/mesas/${t.id}`)}
+                        className="text-amber-400 text-xs font-bold hover:underline bg-transparent border-none cursor-pointer animate-pulse"
+                      >
+                        Ver mesa →
+                      </button>
+                      <button 
+                        onClick={() => handleDelete(t.id, t.name)}
+                        className="p-1.5 rounded-lg bg-[#0a0a0c] hover:bg-red-500 hover:text-white text-gray-500 border border-white/5 transition-all"
+                        title="Eliminar Mesa"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </td>
                   </tr>
                 );

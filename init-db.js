@@ -15,9 +15,11 @@ if (!fs.existsSync(targetDir)) {
   fs.mkdirSync(targetDir, { recursive: true });
 }
 
-// Copiar la base de datos local si no existe en producción
-if (!fs.existsSync(targetDb)) {
-  console.log(`[DB Init] Base de datos no encontrada en ${targetDb}.`);
+// Copiar la base de datos local si no existe en producción (o si forzamos la inicialización temporalmente)
+const FORCE_INIT = true; // ⚠️ ¡IMPORTANTE: Cambiar a false después de este despliegue para evitar sobreescribir ventas futuras!
+
+if (!fs.existsSync(targetDb) || FORCE_INIT) {
+  console.log(`[DB Init] Inicializando base de datos en ${targetDb} (FORCE_INIT: ${FORCE_INIT}).`);
   if (fs.existsSync(templateDb)) {
     console.log(`[DB Init] Copiando plantilla de base de datos desde: ${templateDb}`);
     fs.copyFileSync(templateDb, targetDb);

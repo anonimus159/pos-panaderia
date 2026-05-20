@@ -90,7 +90,7 @@ router.delete('/items/:id', authenticate, async (req, res) => {
     
     if (!item) return res.status(404).json({ success: false, message: 'Ítem no encontrado' });
 
-    // Restaurar stock antes de eliminar (necesitamos los datos del ítem)
+    // Restaurar stock antes de eliminar
     await restoreItemStock(parseInt(id), req.app.get('io'));
 
     // Actualizar el total de la orden
@@ -107,12 +107,50 @@ router.delete('/items/:id', authenticate, async (req, res) => {
     // Auditoría
     audit(req.user.username, 'ORDEN_ITEM_ELIMINAR', `Eliminado ítem ID ${id} (${item.productId}) de la Orden #${item.orderId}. Total actualizado: ${newTotal}`);
 
-    req.app.get('io')?.emit('orderUpdated', { tableId: item.order.tableId });
+    // ── Verificar si quedan ítems en la orden ──────────────────────────────
+    const remaining = await prisma.orderItem.count({ where: { orderId: item.orderId } });
+
+    if (remaining === 0) {
+      // Cancelar la orden vacía
+      await prisma.order.update({
+        where: { id: item.orderId },
+        data: { status: 'CANCELLED' }
+      });
+
+      // Si tenía mesa asignada, liberarla
+      if (item.order.tableId) {
+        // Solo liberar si no hay otras órdenes activas en esa mesa
+        const otrasActivas = await prisma.order.count({
+          where: {
+            tableId: item.order.tableId,
+            id: { not: item.orderId },
+            status: { in: ['PENDING', 'PREPARING', 'READY'] }
+          }
+        });
+
+        if (otrasActivas === 0) {
+          await prisma.table.update({
+            where: { id: item.order.tableId },
+            data: { status: 'LIBRE' }
+          });
+        }
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────
+
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('orderUpdated', { tableId: item.order.tableId });
+      io.emit('tableUpdated');
+      io.emit('table_updated');
+    }
+
     res.json({ success: true });
   } catch (e) {
     console.error('Error al eliminar ítem:', e);
     res.status(500).json({ success: false, message: 'Error al eliminar el ítem' });
   }
 });
+
 
 export default router;

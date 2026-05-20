@@ -134,6 +134,42 @@ router.post('/:id/pay', authenticate, async (req, res) => {
   }
 });
 
+router.post('/', authenticate, async (req, res) => {
+  try {
+    const { name, capacity } = req.body;
+    if (!name) {
+      return res.status(400).json({ success: false, message: 'El nombre de la mesa es requerido.' });
+    }
+
+    // Validar si el nombre ya existe
+    const existingTable = await prisma.table.findUnique({
+      where: { name }
+    });
+    if (existingTable) {
+      return res.status(400).json({ success: false, message: 'Ya existe una mesa con este nombre.' });
+    }
+
+    const table = await prisma.table.create({
+      data: {
+        name,
+        capacity: parseInt(capacity) || 4,
+        status: 'LIBRE'
+      }
+    });
+
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('table_updated', table);
+      io.emit('tableUpdated', table);
+    }
+
+    res.json({ success: true, table });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ success: false, message: 'Error interno al crear la mesa.' });
+  }
+});
+
 router.put('/:id', authenticate, async (req, res) => {
   try {
     const { status } = req.body;
@@ -141,7 +177,11 @@ router.put('/:id', authenticate, async (req, res) => {
       where: { id: parseInt(req.params.id) },
       data: { status }
     });
-    req.app.get('io')?.emit('table_updated', table);
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('table_updated', table);
+      io.emit('tableUpdated', table);
+    }
     res.json({ success: true, table });
   } catch (e) { res.status(500).json({ success: false }); }
 });

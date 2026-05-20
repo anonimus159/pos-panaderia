@@ -16,7 +16,7 @@ if (!fs.existsSync(targetDir)) {
 }
 
 // Copiar la base de datos local si no existe en producción (o si forzamos la inicialización temporalmente)
-const FORCE_INIT = true; // ⚠️ ¡IMPORTANTE: Cambiar a false después de este despliegue para evitar sobreescribir ventas futuras!
+const FORCE_INIT = false; // Desactivado para proteger los datos en producción de futuras sobrescrituras
 
 if (!fs.existsSync(targetDb) || FORCE_INIT) {
   console.log(`[DB Init] Inicializando base de datos en ${targetDb} (FORCE_INIT: ${FORCE_INIT}).`);

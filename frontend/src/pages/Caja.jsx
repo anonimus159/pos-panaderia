@@ -12,24 +12,19 @@ export default function Caja() {
   useEffect(() => {
     fetchOrders();
 
-    const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:3000');
-    
-    socket.on('orderCreated', (newOrder) => {
-      setOrders(prev => [newOrder, ...prev]);
-    });
+    const socket = io();
 
-    socket.on('orderUpdated', (updatedOrder) => {
-      setOrders(prev => {
-        if (updatedOrder.status === 'COMPLETED' || updatedOrder.status === 'CANCELLED') {
-          if (selectedOrder?.id === updatedOrder.id) setSelectedOrder(null);
-          return prev.filter(o => o.id !== updatedOrder.id);
-        }
-        return prev.map(o => o.id === updatedOrder.id ? updatedOrder : o);
-      });
-    });
+    // Recargar órdenes ante cualquier cambio de otro dispositivo
+    const refresh = () => fetchOrders();
+    socket.on('new_order',            refresh);
+    socket.on('orderCreated',         refresh);
+    socket.on('orderUpdated',         refresh);
+    socket.on('order_status_updated', refresh);
+    socket.on('tableUpdated',         refresh);
+    socket.on('table_updated',        refresh);
 
     return () => socket.disconnect();
-  }, [selectedOrder]);
+  }, []);
 
   const fetchOrders = async () => {
     try {

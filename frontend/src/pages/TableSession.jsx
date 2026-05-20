@@ -94,11 +94,25 @@ export default function TableSession() {
     loadConfig();
 
     const socket = io();
-    socket.on('orderUpdated', (updatedOrder) => {
-      if (updatedOrder && updatedOrder.tableId === parseInt(tableId)) {
+
+    // Recarga completa en cualquier cambio relevante de esta mesa o sus órdenes
+    const handleRefresh = (data) => {
+      // Si el evento incluye tableId, solo recargar si es esta mesa
+      if (data && data.tableId !== undefined) {
+        if (data.tableId === parseInt(tableId)) fetchData();
+      } else {
+        // Eventos sin tableId (tableUpdated, table_updated, etc.) siempre recargan
         fetchData();
       }
-    });
+    };
+
+    socket.on('new_order',            handleRefresh);
+    socket.on('orderCreated',         handleRefresh);
+    socket.on('orderUpdated',         handleRefresh);
+    socket.on('order_status_updated', handleRefresh);
+    socket.on('tableUpdated',         handleRefresh);
+    socket.on('table_updated',        handleRefresh);
+    socket.on('product_updated',      handleRefresh);
 
     return () => socket.disconnect();
   }, [tableId]);

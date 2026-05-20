@@ -8,7 +8,7 @@
     "dev:frontend": "cd frontend && npm run dev",
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "build": "npm install --prefix frontend --include=dev && npm run build --prefix frontend && npx prisma generate",
-    "start": "npx prisma db push && node server.js"
+    "start": "node init-db.js && npx prisma db push && node server.js"
   },
   "keywords": [],
   "author": "",

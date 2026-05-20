@@ -14,14 +14,26 @@ router.get('/', authenticate, async (req, res) => {
         } 
       }
     });
+
+    // Auto-corregir mesas atascadas: OCUPADA sin órdenes activas con ítems
+    const fixes = tables
+      .filter(t => t.status === 'OCUPADA' && !t.orders.some(o => o.items.length > 0))
+      .map(t => prisma.table.update({ where: { id: t.id }, data: { status: 'LIBRE' } }));
+    if (fixes.length > 0) {
+      await Promise.all(fixes);
+      fixes.forEach((_, i) => { tables.find(t => t.status === 'OCUPADA' && !t.orders.some(o => o.items.length > 0) && (t.status = 'LIBRE')); });
+    }
+
     res.json({ success: true, tables });
   } catch (e) { res.status(500).json({ success: false }); }
 });
 
+
 router.get('/:id', authenticate, async (req, res) => {
   try {
+    const tableId = parseInt(req.params.id);
     const table = await prisma.table.findUnique({
-      where: { id: parseInt(req.params.id) },
+      where: { id: tableId },
       include: { 
         orders: { 
           where: { status: { in: ['PENDING', 'PREPARING', 'READY'] } },
@@ -34,9 +46,18 @@ router.get('/:id', authenticate, async (req, res) => {
       }
     });
     if (!table) return res.status(404).json({ success: false, message: 'Mesa no encontrada' });
+
+    // Auto-corregir: si está OCUPADA pero no tiene ítems activos, liberarla
+    const hasActiveItems = table.orders.some(o => o.items.length > 0);
+    if (table.status === 'OCUPADA' && !hasActiveItems) {
+      await prisma.table.update({ where: { id: tableId }, data: { status: 'LIBRE' } });
+      table.status = 'LIBRE';
+    }
+
     res.json({ success: true, table });
   } catch (e) { res.status(500).json({ success: false }); }
 });
+
 
 router.post('/:id/pay', authenticate, async (req, res) => {
   try {

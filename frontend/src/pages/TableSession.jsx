@@ -653,6 +653,26 @@ export default function TableSession() {
                 <ShoppingCart className="w-10 h-10 opacity-50" />
               </div>
               <p className="font-medium tracking-wide">Mesa sin consumo</p>
+
+              {/* Botón para liberar mesa atascada */}
+              {table.status === 'OCUPADA' && (
+                <button
+                  onClick={async () => {
+                    try {
+                      await fetch(`/api/tables/${tableId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ status: 'LIBRE' })
+                      });
+                      fetchData();
+                    } catch(e) { console.error(e); }
+                  }}
+                  className="mt-6 px-6 py-3 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-bold rounded-2xl text-sm transition-all flex items-center gap-2 cursor-pointer"
+                >
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  Liberar Mesa
+                </button>
+              )}
             </div>
           )}
         </div>

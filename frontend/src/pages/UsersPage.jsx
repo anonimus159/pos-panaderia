@@ -57,10 +57,33 @@ function UserModal({ user, onClose, onSaved }) {
     username: user?.username || '',
     password: '',
     role: user?.role || 'MESERO',
+    photo: user?.photo || '',
   });
   const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const fileInputRef = React.useRef(null);
+
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    setLoading(true);
+    try {
+      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (data.success) {
+        setForm(f => ({ ...f, photo: data.url }));
+      } else {
+        setError(data.message);
+      }
+    } catch {
+      setError('Error al subir foto');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -70,7 +93,7 @@ function UserModal({ user, onClose, onSaved }) {
 
     setLoading(true);
     try {
-      const body = { username: form.username, role: form.role };
+      const body = { username: form.username, role: form.role, photo: form.photo };
       if (form.password) body.password = form.password;
 
       const res = await fetch(isEdit ? `/api/users/${user.id}` : '/api/users', {
@@ -114,6 +137,31 @@ function UserModal({ user, onClose, onSaved }) {
               <AlertCircle className="w-4 h-4 flex-shrink-0" /> {error}
             </div>
           )}
+
+          {/* Photo */}
+          <div className="flex items-center gap-4">
+            <div 
+              className="w-16 h-16 rounded-2xl bg-[#2A2A32] border border-[#3A3A45] flex items-center justify-center overflow-hidden cursor-pointer hover:border-amber-500 transition-colors"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {form.photo ? (
+                <img src={form.photo} alt="Perfil" className="w-full h-full object-cover" />
+              ) : (
+                <UserCog className="w-6 h-6 text-gray-500" />
+              )}
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-white mb-1">Foto de Perfil</p>
+              <button 
+                type="button" 
+                onClick={() => fileInputRef.current?.click()}
+                className="text-xs text-amber-500 hover:text-amber-400 font-medium"
+              >
+                Cambiar foto
+              </button>
+              <input type="file" ref={fileInputRef} onChange={handlePhotoUpload} accept="image/*" className="hidden" />
+            </div>
+          </div>
 
           {/* Username */}
           <div>
@@ -576,9 +624,15 @@ export default function UsersPage() {
                   
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
-                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl border ${ROLE_COLORS[u.role]}`}>
-                        {ROLE_ICONS[u.role] || '👤'}
-                      </div>
+                      {u.photo ? (
+                        <div className={`w-12 h-12 rounded-2xl overflow-hidden border ${ROLE_COLORS[u.role]}`}>
+                          <img src={u.photo} alt={u.username} className="w-full h-full object-cover" />
+                        </div>
+                      ) : (
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl border ${ROLE_COLORS[u.role]}`}>
+                          {ROLE_ICONS[u.role] || '👤'}
+                        </div>
+                      )}
                       <div>
                         <p className="text-white font-semibold text-lg">{u.username}</p>
                         <span className={`text-xs font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border ${ROLE_COLORS[u.role]}`}>

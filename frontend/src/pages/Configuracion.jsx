@@ -4,6 +4,7 @@ import {
   CheckCircle, Database, Printer, Wifi, AlertTriangle, Monitor,
   Bell, BellOff, RefreshCw, Layers, Clock, ShieldCheck
 } from 'lucide-react';
+import { getLocalPrinters, printRawBase64 } from '../utils/qzTrayService';
 
 const Field = ({ label, icon: Icon, value, onChange, onBlur, placeholder, type = 'text', hint }) => (
   <div className="space-y-2">
@@ -63,6 +64,8 @@ export default function Configuracion() {
   const [saving,  setSaving]  = useState(false);
   const [saved,   setSaved]   = useState(false);
   const [testPrint, setTestPrint] = useState({ loading: false, msg: '', ok: null });
+  const [printers, setPrinters] = useState([]);
+  const [customPrinter, setCustomPrinter] = useState(false);
 
   useEffect(() => { load(); }, []);
 
@@ -71,6 +74,10 @@ export default function Configuracion() {
       const r = await fetch('/api/config');
       const d = await r.json();
       if (d.success) setCfg(d.config);
+
+      // Fetch printers locally via QZ Tray instead of cloud server
+      const localPrinters = await getLocalPrinters();
+      setPrinters(localPrinters || []);
     } catch(e) { console.error(e); }
     finally { setLoading(false); }
   };
@@ -137,17 +144,22 @@ export default function Configuracion() {
   const testPrinter = async () => {
     setTestPrint({ loading: true, msg: '', ok: null });
     try {
-      const r = await fetch('/api/print/ticket', {
+      const r = await fetch('/api/print/test', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: [{ name: 'Prueba de impresión', quantity: 1, subtotal: 0 }],
-          total: 0, orderNumber: 'TEST',
-          tableName: 'PRUEBA'
-        })
+        headers: { 'Content-Type': 'application/json' }
       });
       const d = await r.json();
-      setTestPrint({ loading: false, msg: d.message || (d.success ? 'Impresora OK' : 'Error'), ok: d.success });
+      
+      if (d.success && d.printData) {
+        const printed = await printRawBase64(cfg['printer.nombre'], d.printData);
+        if (printed) {
+          setTestPrint({ loading: false, msg: 'Prueba impresa exitosamente', ok: true });
+        } else {
+          setTestPrint({ loading: false, msg: 'Asegúrate de que QZ Tray esté abierto.', ok: false });
+        }
+      } else {
+        setTestPrint({ loading: false, msg: d.message || 'Error del servidor', ok: false });
+      }
     } catch (e) {
       setTestPrint({ loading: false, msg: 'Error de conexión con el servidor', ok: false });
     }
@@ -264,15 +276,39 @@ export default function Configuracion() {
               <label className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-2 flex items-center gap-1.5">
                 <Monitor className="w-3.5 h-3.5" /> Nombre de la impresora en Windows
               </label>
-              <input
-                value={cfg['printer.nombre'] || ''}
-                onChange={e => set('printer.nombre')(e.target.value)}
-                onBlur={autoSave}
-                placeholder="Ej: POS-80 Thermal Printer"
-                className="w-full bg-[#1E1E26] border border-white/10 text-white rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500/50 transition-colors placeholder-gray-700"
-              />
+              <div className="space-y-3">
+                <select
+                  value={printers.includes(cfg['printer.nombre']) ? cfg['printer.nombre'] : (cfg['printer.nombre'] ? '__CUSTOM__' : '')}
+                  onChange={e => {
+                    const val = e.target.value;
+                    if (val === '__CUSTOM__') {
+                      setCustomPrinter(true);
+                    } else {
+                      setCustomPrinter(false);
+                      set('printer.nombre')(val);
+                    }
+                  }}
+                  className="w-full bg-[#1E1E26] border border-white/10 text-white rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500/50 transition-colors"
+                >
+                  <option value="">-- Selecciona una impresora detectada --</option>
+                  {printers.map(p => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                  <option value="__CUSTOM__">✍️ Escribir nombre manualmente...</option>
+                </select>
+
+                {(customPrinter || (cfg['printer.nombre'] && !printers.includes(cfg['printer.nombre']))) && (
+                  <input
+                    value={cfg['printer.nombre'] || ''}
+                    onChange={e => set('printer.nombre')(e.target.value)}
+                    onBlur={() => autoSave(cfg)}
+                    placeholder="Ej: POS-80 Thermal Printer"
+                    className="w-full bg-[#1E1E26] border border-white/10 text-white rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500/50 transition-colors placeholder-gray-700"
+                  />
+                )}
+              </div>
               <p className="text-xs text-gray-600 mt-2">
-                Abre <span className="text-gray-400 font-mono">Panel de control → Dispositivos e impresoras</span> y copia el nombre exacto de tu impresora.
+                Selecciona la impresora de la lista. Si no aparece, recarga la página o escríbela manualmente.
               </p>
             </div>
             <div>

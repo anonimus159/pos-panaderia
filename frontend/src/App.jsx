@@ -150,6 +150,14 @@ function Layout({ children }) {
       fetchAlerts();
     });
 
+    socket.on('print_job', async ({ printData, printerName }) => {
+      if (printData && printerName) {
+        import('./utils/qzTrayService').then(({ printRawBase64 }) => {
+          printRawBase64(printerName, printData).catch(e => console.error("Error auto-print QZ:", e));
+        });
+      }
+    });
+
     return () => socket.disconnect();
   }, [user]);
 
@@ -267,9 +275,15 @@ function Layout({ children }) {
         {/* User Info */}
         <div className={`px-4 mb-6 flex-shrink-0`}>
           <div className={`flex items-center gap-3 bg-white/5 rounded-2xl border border-white/5 overflow-hidden transition-all ${isCollapsed ? 'p-2 justify-center' : 'p-3'}`}>
-            <div className="w-8 h-8 bg-gradient-to-br from-amber-400 to-amber-600 rounded-lg flex items-center justify-center font-bold text-black text-xs uppercase flex-shrink-0">
-              {user?.username?.charAt(0)}
-            </div>
+            {user?.photo ? (
+              <div className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0">
+                <img src={user.photo} alt={user.username} className="w-full h-full object-cover" />
+              </div>
+            ) : (
+              <div className="w-8 h-8 bg-gradient-to-br from-amber-400 to-amber-600 rounded-lg flex items-center justify-center font-bold text-black text-xs uppercase flex-shrink-0">
+                {user?.username?.charAt(0)}
+              </div>
+            )}
             {!isCollapsed && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="overflow-hidden min-w-0">
                 <p className="text-white text-xs font-semibold truncate">{user?.username}</p>
@@ -360,9 +374,15 @@ function Layout({ children }) {
           <h2 className="text-lg font-bold text-white">
             POS <span className="text-amber-500">Grecia</span>
           </h2>
-          <div className="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center font-bold text-black text-xs">
-            {user?.username?.charAt(0)}
-          </div>
+          {user?.photo ? (
+            <div className="w-8 h-8 rounded-lg overflow-hidden">
+              <img src={user.photo} alt={user.username} className="w-full h-full object-cover" />
+            </div>
+          ) : (
+            <div className="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center font-bold text-black text-xs">
+              {user?.username?.charAt(0)}
+            </div>
+          )}
         </header>
 
         <main className="flex-1 overflow-auto relative z-10 custom-scrollbar">

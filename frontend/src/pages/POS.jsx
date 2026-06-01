@@ -16,6 +16,7 @@ export default function POS() {
   const [activeCategory, setActiveCategory] = useState('ALL');
   const [ticket, setTicket] = useState([]);
   const [search, setSearch] = useState('');
+  const [isCartOpen, setIsCartOpen] = useState(false);
   
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('CASH');
@@ -223,6 +224,7 @@ export default function POS() {
     setShouldInvoice(false);
     setIsSuccess(false);
     setIsPaymentModalOpen(false);
+    setIsCartOpen(false);
     setInvoiceStatus({ loading: false, success: null, msg: '' });
     setLastInvoice(null);
   };
@@ -329,7 +331,7 @@ export default function POS() {
     <div className="flex h-screen bg-transparent text-[var(--text-primary)] font-sans overflow-hidden">
       
       {/* Columna Izquierda: Menú y Agregar */}
-      <div className="flex-1 flex flex-col min-w-0 relative">
+      <div className="flex-1 flex flex-col min-w-0 relative pb-24 lg:pb-0">
         <div className="p-8 pb-4 relative z-10">
           <header className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-4">
@@ -417,8 +419,8 @@ export default function POS() {
       </div>
 
       {/* Columna Derecha: Ticket (Check) */}
-      <div className="w-[420px] bg-[#16161A] border-l border-white/5 flex flex-col shadow-2xl relative z-20">
-        <div className="p-8 border-b border-white/5 flex justify-between items-center bg-gradient-to-b from-white/5 to-transparent">
+      <div className={`fixed inset-0 z-50 lg:static lg:w-[420px] bg-[#16161A] lg:border-l border-white/5 flex flex-col shadow-2xl transition-transform duration-300 ${isCartOpen ? 'translate-y-0' : 'translate-y-full lg:translate-y-0'}`}>
+        <div className="p-6 lg:p-8 border-b border-white/5 flex justify-between items-center bg-gradient-to-b from-white/5 to-transparent">
           <div>
             <h3 className="text-sm uppercase tracking-widest text-gray-500 font-bold mb-1">Orden Actual</h3>
             <div className="text-2xl font-light text-white flex items-center gap-2">
@@ -426,6 +428,12 @@ export default function POS() {
               Ticket de Venta
             </div>
           </div>
+          <button 
+            onClick={() => setIsCartOpen(false)}
+            className="lg:hidden w-10 h-10 bg-white/5 hover:bg-white/10 rounded-full flex items-center justify-center text-gray-400 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-8 space-y-8 scrollbar-hide">
@@ -516,6 +524,20 @@ export default function POS() {
           </button>
         </div>
       </div>
+
+      {/* Floating Mobile Cart Button */}
+      {!isCartOpen && (
+        <button
+          onClick={() => setIsCartOpen(true)}
+          className="lg:hidden fixed bottom-6 left-6 right-6 bg-amber-500 text-black p-4 rounded-2xl shadow-[0_0_30px_rgba(245,158,11,0.3)] font-bold flex justify-between items-center z-40"
+        >
+          <div className="flex items-center gap-2">
+            <ShoppingCart className="w-6 h-6" />
+            <span className="text-lg">Ver Carrito ({ticket.length})</span>
+          </div>
+          <span className="text-xl">${total.toFixed(2)}</span>
+        </button>
+      )}
 
       {/* Modal de Pago (Estilizado) */}
       <AnimatePresence>

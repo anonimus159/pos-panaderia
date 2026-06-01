@@ -11,7 +11,7 @@ router.use(authenticate, requireAdmin);
 router.get('/', async (req, res) => {
   try {
     const users = await prisma.user.findMany({
-      select: { id: true, username: true, role: true, createdAt: true },
+      select: { id: true, username: true, role: true, photo: true, createdAt: true },
       orderBy: { createdAt: 'asc' }
     });
     res.json({ success: true, users });
@@ -20,13 +20,13 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { username, password, role } = req.body;
+    const { username, password, role, photo } = req.body;
     if (!username || !password || !role) return res.status(400).json({ success: false, message: 'Faltan campos' });
     
     const hashed = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({
-      data: { username, password: hashed, role },
-      select: { id: true, username: true, role: true, createdAt: true }
+      data: { username, password: hashed, role, photo },
+      select: { id: true, username: true, role: true, photo: true, createdAt: true }
     });
     audit(req.user.username, 'USUARIO_CREAR', `Usuario creado: ${username}`);
     res.json({ success: true, user });
@@ -36,16 +36,17 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { username, password, role } = req.body;
+    const { username, password, role, photo } = req.body;
     const updateData = {};
     if (username) updateData.username = username;
     if (role) updateData.role = role;
+    if (photo !== undefined) updateData.photo = photo;
     if (password) updateData.password = await bcrypt.hash(password, 10);
     
     const user = await prisma.user.update({
       where: { id: parseInt(id) },
       data: updateData,
-      select: { id: true, username: true, role: true, createdAt: true }
+      select: { id: true, username: true, role: true, photo: true, createdAt: true }
     });
     audit(req.user.username, 'USUARIO_ACTUALIZAR', `Usuario actualizado: ${user.username}`);
     res.json({ success: true, user });

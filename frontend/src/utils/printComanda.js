@@ -22,6 +22,27 @@ async function getConfig() {
 }
 
 export async function printComanda({ tableName, items, type = 'COCINA', total, payMethod, orderNumber, discount, tip, factura }) {
+  // 1. Intentar imprimir directamente en la impresora física conectada al servidor
+  try {
+    const endpoint = type === 'COCINA' ? '/api/print/comanda' : '/api/print/ticket';
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tableName, items, total, payMethod, orderNumber, discount, tip, factura })
+    });
+    const result = await response.json();
+    if (result.success) {
+      console.log('[PRINT] Impresión directa exitosa vía servidor:', result.message);
+      return; // Impresión exitosa, evitar mostrar diálogo del navegador
+    } else {
+      console.warn('[PRINT] Error en impresión directa del servidor:', result.message);
+    }
+  } catch (err) {
+    console.error('[PRINT] No se pudo conectar al servidor de impresión:', err);
+  }
+
+  // 2. Fallback: Diálogo de impresión del navegador local
+  console.log('[PRINT] Usando diálogo de impresión del navegador local como fallback...');
   const config = await getConfig();
   const nombre    = config['negocio.nombre']    || 'POS Bakery';
   const direccion = config['negocio.direccion'] || '';
@@ -109,7 +130,7 @@ export async function printComanda({ tableName, items, type = 'COCINA', total, p
       ${orderNumber ? `Orden: #${orderNumber}` : ''} | Mesa: ${tableName}
     </div>
   </div>
-
+ 
   ${isFactura ? `
   <div class="info-block" style="border: 1px solid #000; padding: 5px;">
     <div class="bold">ADQUIRIENTE:</div>
@@ -118,7 +139,7 @@ export async function printComanda({ tableName, items, type = 'COCINA', total, p
     ${factura.clienteEmail ? `Email: ${factura.clienteEmail}` : ''}
   </div>
   ` : ''}
-
+ 
   <table>
     <thead>
       <tr>
@@ -131,7 +152,7 @@ export async function printComanda({ tableName, items, type = 'COCINA', total, p
       ${itemsHtml}
     </tbody>
   </table>
-
+ 
   ${type !== 'COCINA' ? `
    <div class="totals">
      <div class="row"><span>Subtotal:</span><span>$${Math.round(total - (tip || 0) + (discount || 0)).toLocaleString('es-CO')}</span></div>
@@ -141,7 +162,7 @@ export async function printComanda({ tableName, items, type = 'COCINA', total, p
      <div class="row" style="margin-top:5px; font-size: 9px;"><span>Método de Pago:</span><span>${methodLabel[payMethod] || payMethod || 'Efectivo'}</span></div>
    </div>
   ` : ''}
-
+ 
   ${isFactura ? `
   <div class="dian-info">
     <div class="bold">Resolución DIAN No. 187640000001</div>
@@ -154,15 +175,15 @@ export async function printComanda({ tableName, items, type = 'COCINA', total, p
     [CÓDIGO QR DIAN]
   </div>
   ` : ''}
-
+ 
   <div class="footer text-center">
     ${footer}<br>
     ${legal ? `<div style="font-size: 8px; margin-top: 5px; font-style: italic;">${legal}</div>` : ''}
     Software: POS Panadería v2.0 - Colombia<br>
     ${isFactura ? 'Factura generada electrónicamente' : 'Documento Equivalente POS'}
   </div>
-</body>
-</html>`;
+ </body>
+ </html>`;
 
   // Imprimir usando un iframe oculto para evitar popups bloqueados
   let iframe = document.getElementById('print-frame');

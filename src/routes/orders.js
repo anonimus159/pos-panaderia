@@ -3,6 +3,7 @@ import prisma from '../../prismaClient.js';
 import { authenticate } from '../middleware/auth.js';
 import { decrementOrderStock, restoreItemStock } from '../utils/stock.js';
 import { audit } from '../utils/audit.js';
+import { getPrinterInstance } from '../utils/printerHelper.js';
 
 const router = express.Router();
 
@@ -19,7 +20,7 @@ router.get('/', authenticate, async (req, res) => {
 
 router.post('/', authenticate, async (req, res) => {
   try {
-    const { type, tableId, items, total, tip, paymentMethod } = req.body;
+    const { type, tableId, items, total, tip, paymentMethod, printComanda } = req.body;
     
     const order = await prisma.order.create({
       data: {
@@ -36,7 +37,7 @@ router.post('/', authenticate, async (req, res) => {
           }))
         }
       },
-      include: { items: true }
+      include: { items: { include: { product: true } }, table: true }
     });
 
     // Actualizar estado de la mesa si aplica
@@ -60,6 +61,75 @@ router.post('/', authenticate, async (req, res) => {
       decrementOrderStock(order.id, io);
       io.emit('product_updated');
     }
+
+    // ── Auto-impresión de comanda de cocina ──────────────────────────────────
+    // Se imprime en background (no bloquea la respuesta al cliente)
+    // Activado si: el body trae printComanda=true  O  config printer.autoComanda='true'
+    setImmediate(async () => {
+      try {
+        const cfgRows = await prisma.config.findMany();
+        const cfg = {};
+        cfgRows.forEach(r => { cfg[r.key] = r.value; });
+
+        const autoComanda = printComanda === true || cfg['printer.autoComanda'] === 'true';
+        if (!autoComanda) return;
+
+        const printerName = cfg['printer.nombre'] || '';
+        if (!printerName) return; // Sin impresora configurada, omitir silenciosamente
+
+        const printer = await getPrinterInstance(cfg);
+
+        const now = new Date();
+        const tipoLabel = order.type === 'TAKEOUT' ? '[ PARA LLEVAR ]'
+                        : order.type === 'DELIVERY' ? '[ DOMICILIO ]'
+                        : order.table ? `[ Mesa: ${order.table.name} ]`
+                        : '[ En Salon ]';
+
+        printer.alignCenter();
+        printer.bold(true);
+        printer.setTextSize(1, 1);
+        printer.println('*** COCINA ***');
+        printer.setTextNormal();
+        printer.bold(false);
+        printer.drawLine();
+
+        printer.alignLeft();
+        printer.bold(true);
+        printer.println(`Hora: ${now.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`);
+        printer.println(`Orden #${order.id}`);
+        printer.bold(false);
+
+        printer.alignCenter();
+        printer.bold(true);
+        printer.setTextSize(1, 1);
+        printer.println(tipoLabel);
+        printer.setTextNormal();
+        printer.bold(false);
+        printer.drawLine();
+
+        printer.alignLeft();
+        for (const item of order.items) {
+          printer.bold(true);
+          printer.println(`${item.quantity}x  ${item.product.name}`);
+          printer.bold(false);
+          if (item.notes) printer.println(`   >> ${item.notes}`);
+        }
+
+        printer.drawLine();
+        printer.alignCenter();
+        printer.println(cfg['negocio.nombre'] || '');
+        printer.cut();
+
+        const printData = printer.getBuffer().toString('base64');
+        printer.clear();
+        io.emit('print_job', { printData, printerName });
+        console.log(`[PRINT] Evento print_job emitido para Comanda #${order.id} ✅`);
+      } catch (printErr) {
+        // Error de impresión no cancela la orden
+        console.warn(`[PRINT] Comanda #${order.id} falló (no crítico):`, printErr.message);
+      }
+    });
+    // ─────────────────────────────────────────────────────────────────────────
 
     res.json({ success: true, order });
   } catch (e) { 

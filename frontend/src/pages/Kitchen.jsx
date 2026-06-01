@@ -34,7 +34,7 @@ export default function Kitchen() {
 
     const socket = io();
 
-    socket.on('orderCreated', (newOrder) => {
+    socket.on('new_order', (newOrder) => {
       if (newOrder.items && newOrder.items.length > 0) {
         setOrders(prev => [newOrder, ...prev]);
         // Solo sonar si está habilitado en config
